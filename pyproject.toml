@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "gcn_tutorial"
 version = "0.1.0"
-description = ""
+description = "Tensorflow 2.2 port of GCN by dsbridge - https://github.com/dbusbridge"
 authors = ["adimyth <mishraaditya6991@gmail.com>"]
 
 [tool.poetry.dependencies]
@@ -16,6 +16,7 @@ pre-commit = "^2.7.1"
 tensorflow = "2.2.0"
 numpy = "^1.19.2"
 scipy = "1.4.1"
+PyQt5 = "^5.15.1"
 
 [tool.poetry.dev-dependencies]
 
