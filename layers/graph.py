@@ -8,14 +8,11 @@ def matmul(x, y, sparse=False):
     return tf.matmul(x, y)
 
 
-class GraphConvLayer:
+class GraphConvLayer(tf.keras.layers.Layer):
     def __init__(
-            self,
-            input_dim,
-            output_dim,
-            activation=None,
-            use_bias=False,
-            name="graph_conv"):
+        self, input_dim, output_dim, activation=None, use_bias=False, name="graph_conv"
+    ):
+        super(GraphConvLayer, self).__init__()
         """Initialise a Graph Convolution layer.
 
         Args:
@@ -31,30 +28,28 @@ class GraphConvLayer:
         self.output_dim = output_dim
         self.activation = activation
         self.use_bias = use_bias
-        self.name = name
 
-        with tf.variable_scope(self.name):
-            self.w = tf.get_variable(
-                name='w',
+    def build(self):
+        with tf.name_scope(self.name):
+            self.w = self.add_weight(
+                name="w",
                 shape=(self.input_dim, self.output_dim),
-                initializer=tf.initializers.glorot_uniform())
+                initializer=tf.initializers.glorot_uniform(),
+            )
 
             if self.use_bias:
-                self.b = tf.get_variable(
-                    name='b',
-                    initializer=tf.constant(0.1, shape=(self.output_dim,)))
+                self.b = tf.add_weight(
+                    name="b", initializer=tf.constant(0.1, shape=(self.output_dim,))
+                )
 
-    def call(self, adj_norm, x, sparse=False):
+    def call(self, adj_norm, x, sparse=False):  # A=D̃⁻¹/²ÃD̃⁻¹/²
         x = matmul(x=x, y=self.w, sparse=sparse)  # XW
         x = matmul(x=adj_norm, y=x, sparse=True)  # AXW
 
         if self.use_bias:
-            x = tf.add(x, self.use_bias)          # AXW + B
+            x = tf.add(x, self.use_bias)  # AXW + B
 
         if self.activation is not None:
-            x = self.activation(x)                # activation(AXW + B)
+            x = self.activation(x)  # activation(AXW + B)
 
         return x
-
-    def __call__(self, *args, **kwargs):
-        return self.call(*args, **kwargs)
