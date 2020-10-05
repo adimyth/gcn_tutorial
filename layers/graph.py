@@ -4,7 +4,7 @@ import tensorflow as tf
 def matmul(x, y, sparse=False):
     """Wrapper for sparse matrix multiplication."""
     if sparse:
-        return tf.sparse_tensor_dense_matmul(x, y)
+        return tf.sparse.sparse_dense_matmul(x, y)
     return tf.matmul(x, y)
 
 
@@ -29,7 +29,6 @@ class GraphConvLayer(tf.keras.layers.Layer):
         self.activation = activation
         self.use_bias = use_bias
 
-    def build(self):
         with tf.name_scope(self.name):
             self.w = self.add_weight(
                 name="w",
