@@ -9,48 +9,55 @@ import utils.sparse as us
 
 g = nx.read_graphml("R/karate.graphml")
 
-nx.draw(
-    g,
-    cmap=plt.get_cmap("jet"),
-    node_color=np.log(list(nx.get_node_attributes(g, "membership").values())),
-)
+# nx.draw(
+#     g,
+#     cmap=plt.get_cmap("jet"),
+#     node_color=np.log(list(nx.get_node_attributes(g, "membership").values())),
+# )
 
 adj = nx.adj_matrix(g)
-# number of nodes
+# Get important parameters of adjacency matrix
 n_nodes = adj.shape[0]
 
-# adding self-node connection - Ã=A+I
+# Some preprocessing
 adj_tilde = adj + np.identity(n=adj.shape[0])
-# deriving degree array - D̃
 d_tilde_diag = np.squeeze(np.sum(np.array(adj_tilde), axis=1))
-# inverse scaling degree array: D̃⁻¹
 d_tilde_inv_sqrt_diag = np.power(d_tilde_diag, -1 / 2)
-# converting degree array to diagonal matrix:
 d_tilde_inv_sqrt = np.diag(d_tilde_inv_sqrt_diag)
-# D̃⁻¹/²ÃD̃⁻¹/²
 adj_norm = np.dot(np.dot(d_tilde_inv_sqrt, adj_tilde), d_tilde_inv_sqrt)
 adj_norm_tuple = us.sparse_to_tuple(scipy.sparse.coo_matrix(adj_norm))
+adj_norm_sparse_tensor = us.tuple_to_sparsetensor(adj_norm_tuple)
 
 # Features are just the identity matrix
 feat_x = np.identity(n=adj.shape[0])
 feat_x_tuple = us.sparse_to_tuple(scipy.sparse.coo_matrix(feat_x))
+feat_x_sparse_tensor = us.tuple_to_sparsetensor(feat_x_tuple)
 
 l_sizes = [4, 4, 2]
 
 o_fc1 = lg.GraphConvLayer(
-    input_dim=feat_x.shape[-1], output_dim=l_sizes[0], name="fc1", activation=tf.nn.tanh
-)(adj_norm=adj_norm_tuple, x=feat_x_tuple, sparse=True)
+    input_dim=feat_x.shape[-1],
+    output_dim=l_sizes[0], 
+    name="fc1", 
+    activation=tf.nn.tanh
+    )(adj_norm=adj_norm_sparse_tensor, x=feat_x_sparse_tensor, sparse=True)
 
 o_fc2 = lg.GraphConvLayer(
-    input_dim=l_sizes[0], output_dim=l_sizes[1], name="fc2", activation=tf.nn.tanh
-)(adj_norm=adj_norm_tuple, x=o_fc1)
+    input_dim=l_sizes[0], 
+    output_dim=l_sizes[1], 
+    name="fc2", 
+    activation=tf.nn.tanh
+    )(adj_norm=adj_norm_sparse_tensor, x=o_fc1)
 
 outputs = lg.GraphConvLayer(
-    input_dim=l_sizes[1], output_dim=l_sizes[2], name="fc3", activation=tf.nn.tanh
-)(adj_norm=adj_norm_tuple, x=o_fc2)
+    input_dim=l_sizes[1], 
+    output_dim=l_sizes[2], 
+    name="fc3", 
+    activation=tf.nn.tanh
+    )(adj_norm=adj_norm_sparse_tensor, x=o_fc2)
 
-x_min, x_max = outputs[:, 0].min(), outputs[:, 0].max()
-y_min, y_max = outputs[:, 1].min(), outputs[:, 1].max()
+x_min, x_max = outputs[:, 0].numpy().min(), outputs[:, 0].numpy().max()
+y_min, y_max = outputs[:, 1].numpy().min(), outputs[:, 1].numpy().max()
 
 node_pos_gcn = {n: tuple(outputs[j]) for j, n in enumerate(nx.nodes(g))}
 node_pos_ran = {
