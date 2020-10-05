@@ -1,0 +1,7 @@
+https://tkipf.github.io/graph-convolutional-networks/
+https://github.com/dbusbridge/gcn_tutorial
+https://medium.com/ai-in-plain-english/graph-convolutional-networks-gcn-baf337d5cb6b
+https://www.learnopencv.com/graph-convolutional-networks-model-relations-in-data/
+https://eng.uber.com/uber-eats-graph-learning/
+https://stellargraph.readthedocs.io/en/stable/demos/node-classification/gcn-node-classification.html
+https://github.com/tkipf/gcn

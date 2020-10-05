@@ -2,7 +2,7 @@
 
 ## Data
 
-The data we use is [Zachary's karate club](https://en.wikipedia.org/wiki/Zachary%27s_karate_club), a standard toy social network. It is a data set consisting of: 
+The data we use is [Zachary's karate club](https://en.wikipedia.org/wiki/Zachary%27s_karate_club), a standard toy social network. It is a data set consisting of:
 
 + 34 nodes, each corresponding to members of a karate club
 
@@ -22,7 +22,7 @@ A conflict arose in the club which caused the club to split into several faction
 
 ## Requirements
 
-This project is built for running on an `Anaconda` virtual environment. I will add support for alternative setups later. 
+This project is built for running on an `Anaconda` virtual environment. I will add support for alternative setups later.
 
 ## Setup
 
@@ -51,6 +51,7 @@ For the original TensorFlow implementation (in a Keras style) see https://github
 ### Blog posts
 
 + Great introductory post https://tkipf.github.io/graph-convolutional-networks/
++ Graph Convolution Networks - https://medium.com/ai-in-plain-english/graph-convolutional-networks-gcn-baf337d5cb6b
 
 ### Papers
 
