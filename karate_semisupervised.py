@@ -14,8 +14,9 @@ g = nx.read_graphml("R/karate.graphml")
 
 nx.draw(
     g,
-    cmap=plt.get_cmap('jet'),
-    node_color=np.log(list(nx.get_node_attributes(g, 'membership').values())))
+    cmap=plt.get_cmap("jet"),
+    node_color=np.log(list(nx.get_node_attributes(g, "membership").values())),
+)
 
 adj = nx.adj_matrix(g)
 # Get important parameters of adjacency matrix
@@ -76,6 +77,7 @@ def masked_accuracy(preds, labels, mask):
     accuracy_all *= mask
     return tf.reduce_mean(accuracy_all)
 
+
 print(f"Features: {feat_x.shape}")
 print(f"Adjacency Matrix: {adj_norm_sparse_tensor.shape}")
 print(f"Train target: {y_train.shape}")
@@ -88,25 +90,21 @@ feat_in = tf.keras.layers.Input(shape=(feat_x.shape[-1],))
 adj_in = tf.keras.layers.Input(shape=(adj_norm_sparse_tensor.shape[0],), sparse=True)
 l_sizes = [4, 4, 2, nb_classes]
 
-o_fc1 = lg.GraphConvLayer(
-    output_dim=l_sizes[0],
-    name='fc1',
-    activation=tf.nn.tanh)([adj_in, feat_in])
+o_fc1 = lg.GraphConvLayer(output_dim=l_sizes[0], name="fc1", activation=tf.nn.tanh)(
+    [adj_in, feat_in]
+)
 
-o_fc2 = lg.GraphConvLayer(
-    output_dim=l_sizes[1],
-    name='fc2',
-    activation=tf.nn.tanh)([adj_in, o_fc1])
+o_fc2 = lg.GraphConvLayer(output_dim=l_sizes[1], name="fc2", activation=tf.nn.tanh)(
+    [adj_in, o_fc1]
+)
 
-o_fc3 = lg.GraphConvLayer(
-    output_dim=l_sizes[2],
-    name='fc3',
-    activation=tf.nn.tanh)([adj_in, o_fc2])
+o_fc3 = lg.GraphConvLayer(output_dim=l_sizes[2], name="fc3", activation=tf.nn.tanh)(
+    [adj_in, o_fc2]
+)
 
-o_fc4 = lg.GraphConvLayer(
-    output_dim=l_sizes[3],
-    name='fc4',
-    activation=tf.identity)([adj_in, o_fc3])
+o_fc4 = lg.GraphConvLayer(output_dim=l_sizes[3], name="fc4", activation=tf.identity)(
+    [adj_in, o_fc3]
+)
 
 model = tf.keras.models.Model(inputs=[adj_in, feat_in], outputs=o_fc4)
 optimizer = tf.keras.optimizers.Adam(learning_rate=1e-2)
@@ -116,16 +114,21 @@ t = time.time()
 for epoch in range(300):
     with tf.GradientTape() as tape:
         logits = model((adj_norm_sparse_tensor, feat_x))
-        train_loss = masked_softmax_cross_entropy(preds=logits, labels=y_train, mask=train_mask)
+        train_loss = masked_softmax_cross_entropy(
+            preds=logits, labels=y_train, mask=train_mask
+        )
         train_acc = masked_accuracy(preds=logits, labels=y_train, mask=train_mask)
     grads = tape.gradient(train_loss, model.trainable_weights)
     optimizer.apply_gradients(zip(grads, model.trainable_weights))
 
     if epoch % 50 == 0:
-        val_loss = masked_softmax_cross_entropy(preds=logits, labels=y_val, mask=val_mask)
+        val_loss = masked_softmax_cross_entropy(
+            preds=logits, labels=y_val, mask=val_mask
+        )
         val_acc = masked_accuracy(preds=logits, labels=y_val, mask=val_mask)
 
-        print("Epoch:",
+        print(
+            "Epoch:",
             "%04d" % (epoch + 1),
             "train_loss=",
             "{:.5f}".format(train_loss),

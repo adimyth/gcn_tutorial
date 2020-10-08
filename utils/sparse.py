@@ -30,9 +30,8 @@ def sparse_to_tuple(sparse_mx) -> tuple:
 
 def tuple_to_sparsetensor(sparse_tuple: tuple) -> tf.sparse.SparseTensor:
     """Converts tuple containing coordintates, values & shape to tf.SparseTensor"""
-    sparse_tensor = tf.sparse.SparseTensor(indices=sparse_tuple[0], 
-                                            values=sparse_tuple[1], 
-                                            dense_shape=sparse_tuple[2]
-                                            )
+    sparse_tensor = tf.sparse.SparseTensor(
+        indices=sparse_tuple[0], values=sparse_tuple[1], dense_shape=sparse_tuple[2]
+    )
     sparse_tensor = tf.cast(sparse_tensor, tf.float32)
     return sparse_tensor

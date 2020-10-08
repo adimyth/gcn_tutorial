@@ -4,6 +4,7 @@ import numpy as np
 import scipy.sparse
 import tensorflow as tf
 import tensorflow.keras.backend as K
+
 tf.executing_eagerly()
 
 import layers.graph as lg
@@ -36,23 +37,17 @@ feat_x = np.identity(n=adj.shape[0])
 # BUILDING 3-Layer GCN MODEL
 l_sizes = [4, 4, 2]
 
-o_fc1 = lg.GraphConvLayer(
-    output_dim=l_sizes[0],
-    name="fc1",
-    activation=tf.nn.tanh
-    )([adj_norm_sparse_tensor, feat_x])
+o_fc1 = lg.GraphConvLayer(output_dim=l_sizes[0], name="fc1", activation=tf.nn.tanh)(
+    [adj_norm_sparse_tensor, feat_x]
+)
 
-o_fc2 = lg.GraphConvLayer(
-    output_dim=l_sizes[1],
-    name="fc2",
-    activation=tf.nn.tanh
-    )([adj_norm_sparse_tensor, o_fc1])
+o_fc2 = lg.GraphConvLayer(output_dim=l_sizes[1], name="fc2", activation=tf.nn.tanh)(
+    [adj_norm_sparse_tensor, o_fc1]
+)
 
-outputs = lg.GraphConvLayer(
-    output_dim=l_sizes[2],
-    name="fc3",
-    activation=tf.nn.tanh
-    )([adj_norm_sparse_tensor, o_fc2])
+outputs = lg.GraphConvLayer(output_dim=l_sizes[2], name="fc3", activation=tf.nn.tanh)(
+    [adj_norm_sparse_tensor, o_fc2]
+)
 
 x_min, x_max = outputs[:, 0].numpy().min(), outputs[:, 0].numpy().max()
 y_min, y_max = outputs[:, 1].numpy().min(), outputs[:, 1].numpy().max()
