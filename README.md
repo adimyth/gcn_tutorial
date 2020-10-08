@@ -1,3 +1,5 @@
+Forked from "https://github.com/dbusbridge/gcn_tutorial". Ported to work with Tensorflow 2.2
+
 # A tutorial on Graph Convolutional Neural Networks
 
 ## Data
@@ -14,33 +16,55 @@ A conflict arose in the club which caused the club to split into several faction
 
 + `R/` contains the code necessary to produce the `graphml` representation of the karate club network,
 
-+ `layers/graph.py` contains the TensorFlow implementation of the Graph Convolutional Layer,
++ `layers/graph.py` contains the TensorFlow 2.2 implementation of the Graph Convolutional Layer,
 
 + `utils/sparse.py` contains helper functions for dealing with sparse matrices,
 
-+ `examples/` contains two python scripts that demonstrate how Graph Convolutional Neural Networks perform in an unsupervised and semi-supervised manner, following the appendix of http://arxiv.org/abs/1609.02907.
++ `karate_supervised.py` and `karate_unsupervised.py` are two python scripts that demonstrate how Graph Convolutional Neural Networks perform in an unsupervised and semi-supervised manner, following the appendix of http://arxiv.org/abs/1609.02907.
 
 ## Requirements
 
-This project is built for running on an `Anaconda` virtual environment. I will add support for alternative setups later.
+This project is built for running on an [poetry](https://python-poetry.org/) virtual environment. I will add support for alternative setups later. All experiments are run on python3.7
 
 ## Setup
 
-+ Clone,
++ Clone the repository.
 
-+ If you want to use the gpu version of tensorflow, edit the `environment.yml`
++ Install [asdf](https://asdf-vm.com). *asdf* allows us to manage multiple runtime versions such for different languages such as `nvm`, `rbenv`, `pyenv`, etc using a CLI tool
+    * Install asdf using this [guide](https://asdf-vm.com/#/core-manage-asdf-vm?id=install)
+	* Now install `python3.7`
+	```bash
+	asdf plugin add python
+	asdf install python 3.7.0
+	asdf local python 3.7.0	# sets python3.7 as interpreter for the project
+	```
++ Install poetry. [Poetry](https://python-poetry.org/docs/) is a python dependency management & packaging tool. Allows us to declare project libraries dependency & manage them
+	```bash
+	asdf plugin add poetry
+	asdf install poetry 1.1.1
+	asdf local poetry 1.1.1
+	```
+
++ Create the virtual environment
 
 ```
-tensorflow -> tensorflow-gpu
+poetry install
 ```
 
-+ Create the Anaconda virtual environment `env_graph_convnet`
-
+## Running the scripts
 ```
-$ conda env create
+poetry run python karate_semisupervised.py
 ```
 
 And you're ready to go!
+
+**Unsupervised Experiment**
+
+![un-supervised](images/unsupervised.png)
+
+**Semisupervised Experiment**
+
+![semi-supervised](images/semi_supervised.png)
 
 ## Original implementation of Graph Convolutional Neural Networks
 
