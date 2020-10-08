@@ -4,9 +4,9 @@ import matplotlib.pyplot as plt
 import networkx as nx
 import numpy as np
 import scipy.sparse
-from spektral.layers import GraphConv
 import tensorflow as tf
 import tensorflow.keras.backend as K
+from spektral.layers import GraphConv
 
 import utils.sparse as us
 
@@ -14,15 +14,23 @@ g = nx.read_graphml("R/karate.graphml")
 
 nx.draw(
     g,
-    cmap=plt.get_cmap('jet'),
-    node_color=np.log(list(nx.get_node_attributes(g, 'membership').values())))
+    cmap=plt.get_cmap("jet"),
+    node_color=np.log(list(nx.get_node_attributes(g, "membership").values())),
+)
 
-# Adjacency Matrix
 adj = nx.adj_matrix(g)
 # Get important parameters of adjacency matrix
 n_nodes = adj.shape[0]
 # Features are just the identity matrix
 feat_x = np.identity(n=adj.shape[0])
+# Preprocessing - Adding self-loop & scaling by degree matrix
+adj_tilde = adj + np.identity(n=adj.shape[0])
+d_tilde_diag = np.squeeze(np.sum(np.array(adj_tilde), axis=1))
+d_tilde_inv_sqrt_diag = np.power(d_tilde_diag, -1 / 2)
+d_tilde_inv_sqrt = np.diag(d_tilde_inv_sqrt_diag)
+adj_norm = np.dot(np.dot(d_tilde_inv_sqrt, adj_tilde), d_tilde_inv_sqrt)
+adj_norm_tuple = us.sparse_to_tuple(scipy.sparse.coo_matrix(adj_norm))
+adj = us.tuple_to_sparsetensor(adj_norm_tuple)
 
 # Semi-supervised
 memberships = [m - 1 for m in nx.get_node_attributes(g, "membership").values()]
@@ -48,8 +56,25 @@ for l in labels_to_keep:
     train_mask[l] = True
     val_mask[l] = False
 
-# GCN Preprocessing
-adj = GraphConv.preprocess(adj).astype('f4')
+
+def masked_softmax_cross_entropy(preds, labels, mask):
+    """Softmax cross-entropy loss with masking."""
+    loss = tf.nn.softmax_cross_entropy_with_logits(logits=preds, labels=labels)
+    mask = tf.cast(mask, dtype=tf.float32)
+    mask /= tf.reduce_mean(mask)
+    loss *= mask
+    return tf.reduce_mean(loss)
+
+
+def masked_accuracy(preds, labels, mask):
+    """Accuracy with masking."""
+    correct_prediction = tf.equal(tf.argmax(preds, 1), tf.argmax(labels, 1))
+    accuracy_all = tf.cast(correct_prediction, tf.float32)
+    mask = tf.cast(mask, dtype=tf.float32)
+    mask /= tf.reduce_mean(mask)
+    accuracy_all *= mask
+    return tf.reduce_mean(accuracy_all)
+
 
 print(f"Features: {feat_x.shape}")
 print(f"Adjacency Matrix: {adj.shape}")
@@ -67,16 +92,66 @@ o_fc1 = GraphConv(l_sizes[0], tf.nn.tanh)([feat_in, adj_in])
 o_fc2 = GraphConv(l_sizes[1], tf.nn.tanh)([o_fc1, adj_in])
 o_fc3 = GraphConv(l_sizes[2], tf.nn.tanh)([o_fc2, adj_in])
 o_fc4 = GraphConv(l_sizes[3], tf.identity)([o_fc3, adj_in])
-model = tf.keras.models.Model(inputs=[feat_in, adj_in], outputs=o_fc4)
-model.compile(optimizer="adam", loss="categorical_crossentropy", weighted_metrics=["acc"])
 
-model.fit([feat_x, adj], y_train,
-        sample_weight=train_mask,
-        validation_data=([feat_x, adj], y_val, val_mask),
-        batch_size=n_nodes,
-        shuffle=False)
+model = tf.keras.models.Model(inputs=[adj_in, feat_in], outputs=o_fc4)
+optimizer = tf.keras.optimizers.Adam(learning_rate=1e-2)
 
-loss, acc = model.evaluate([feat_x, adj], y_val,
-                            sample_weight=val_mask,
-                            batch_size=n_nodes)
-print(f"Validation Loss: {loss}\tValidation Accuracy: {acc}")
+outputs = {}
+t = time.time()
+for epoch in range(301):
+    with tf.GradientTape() as tape:
+        logits = model((adj, feat_x))
+        train_loss = masked_softmax_cross_entropy(
+            preds=logits, labels=y_train, mask=train_mask
+        )
+        train_acc = masked_accuracy(preds=logits, labels=y_train, mask=train_mask)
+    grads = tape.gradient(train_loss, model.trainable_weights)
+    optimizer.apply_gradients(zip(grads, model.trainable_weights))
+
+    if epoch % 50 == 0:
+        val_loss = masked_softmax_cross_entropy(
+            preds=logits, labels=y_val, mask=val_mask
+        )
+        val_acc = masked_accuracy(preds=logits, labels=y_val, mask=val_mask)
+
+        print(
+            "Epoch:",
+            "%04d" % (epoch),
+            "train_loss=",
+            "{:.5f}".format(train_loss),
+            "train_acc=",
+            "{:.5f}".format(train_acc),
+            "val_loss=",
+            "{:.5f}".format(val_loss),
+            "val_acc=",
+            "{:.5f}".format(val_acc),
+            "time=",
+            "{:.5f}".format(time.time() - t),
+        )
+        K.clear_session()
+        interim_model = tf.keras.models.Model(inputs=[adj_in, feat_in], outputs=o_fc3)
+        temp_out = interim_model((adj, feat_x))
+        outputs[epoch] = temp_out
+
+node_positions = {
+    o: {n: tuple(outputs[o][j]) for j, n in enumerate(nx.nodes(g))} for o in outputs
+}
+plot_titles = {o: "epoch {o}".format(o=o) for o in outputs}
+
+# Two subplots, unpack the axes array immediately
+f, axes = plt.subplots(nrows=2, ncols=3, sharey=True, sharex=True)
+
+e = list(node_positions.keys())
+
+for i, ax in enumerate(axes.flat):
+    pos = node_positions[e[i]]
+    ax.set_title(plot_titles[e[i]])
+    nx.draw(
+        g,
+        cmap=plt.get_cmap("jet"),
+        node_color=np.log(list(nx.get_node_attributes(g, "membership").values())),
+        pos=pos,
+        ax=ax,
+    )
+
+plt.show()
