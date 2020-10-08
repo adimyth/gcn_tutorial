@@ -5,6 +5,7 @@ import networkx as nx
 import numpy as np
 import scipy.sparse
 import tensorflow as tf
+import tensorflow.keras.backend as K
 
 import layers.graph as lg
 import utils.sparse as us
@@ -31,8 +32,6 @@ adj_norm_sparse_tensor = us.tuple_to_sparsetensor(adj_norm_tuple)
 
 # Features are just the identity matrix
 feat_x = np.identity(n=adj.shape[0])
-feat_x_tuple = us.sparse_to_tuple(scipy.sparse.coo_matrix(feat_x))
-feat_x_sparse_tensor = us.tuple_to_sparsetensor(feat_x_tuple)
 
 # Semi-supervised
 memberships = [m - 1 for m in nx.get_node_attributes(g, "membership").values()]
@@ -58,32 +57,6 @@ for l in labels_to_keep:
     train_mask[l] = True
     val_mask[l] = False
 
-l_sizes = [4, 4, 2, nb_classes]
-
-o_fc1 = lg.GraphConvLayer(
-    input_dim=feat_x.shape[-1], 
-    output_dim=l_sizes[0], 
-    name="fc1", 
-    activation=tf.nn.tanh)(adj_norm=adj_norm_sparse_tensor, x=feat_x_sparse_tensor, sparse=True)
-
-o_fc2 = lg.GraphConvLayer(
-    input_dim=l_sizes[0], 
-    output_dim=l_sizes[1], 
-    name="fc2", 
-    activation=tf.nn.tanh)(adj_norm=adj_norm_sparse_tensor, x=o_fc1)
-
-o_fc3 = lg.GraphConvLayer(
-    input_dim=l_sizes[1], 
-    output_dim=l_sizes[2], 
-    name="fc3", 
-    activation=tf.nn.tanh)(adj_norm=adj_norm_sparse_tensor, x=o_fc2)
-
-o_fc4 = lg.GraphConvLayer(
-    input_dim=l_sizes[2], 
-    output_dim=l_sizes[3], 
-    name="fc4", 
-    activation=tf.identity)(adj_norm=adj_norm_sparse_tensor, x=o_fc3)
-
 
 def masked_softmax_cross_entropy(preds, labels, mask):
     """Softmax cross-entropy loss with masking."""
@@ -103,36 +76,56 @@ def masked_accuracy(preds, labels, mask):
     accuracy_all *= mask
     return tf.reduce_mean(accuracy_all)
 
+print(f"Features: {feat_x.shape}")
+print(f"Adjacency Matrix: {adj_norm_sparse_tensor.shape}")
+print(f"Train target: {y_train.shape}")
+print(f"Validation target: {y_val.shape}")
+print(f"Train Mask: {train_mask.shape}")
+print(f"Validation Mask: {val_mask.shape}", end="\n\n")
 
-with tf.name_scope("optimizer"):
-    loss = masked_softmax_cross_entropy(
-        preds=o_fc4, labels=ph["labels"], mask=ph["mask"]
-    )
-    accuracy = masked_accuracy(preds=o_fc4, labels=ph["labels"], mask=ph["mask"])
-    optimizer = tf.train.AdamOptimizer(learning_rate=1e-2)
-    opt_op = optimizer.minimize(loss)
+# BUILDING 4-Layer GCN MODEL
+feat_in = tf.keras.layers.Input(shape=(feat_x.shape[-1],))
+adj_in = tf.keras.layers.Input(shape=(adj_norm_sparse_tensor.shape[0],), sparse=True)
+l_sizes = [4, 4, 2, nb_classes]
 
-epochs = 300
-save_every = 50
+o_fc1 = lg.GraphConvLayer(
+    output_dim=l_sizes[0],
+    name='fc1',
+    activation=tf.nn.tanh)([adj_in, feat_in])
 
-t = time.time()
+o_fc2 = lg.GraphConvLayer(
+    output_dim=l_sizes[1],
+    name='fc2',
+    activation=tf.nn.tanh)([adj_in, o_fc1])
+
+o_fc3 = lg.GraphConvLayer(
+    output_dim=l_sizes[2],
+    name='fc3',
+    activation=tf.nn.tanh)([adj_in, o_fc2])
+
+o_fc4 = lg.GraphConvLayer(
+    output_dim=l_sizes[3],
+    name='fc4',
+    activation=tf.identity)([adj_in, o_fc3])
+
+model = tf.keras.models.Model(inputs=[adj_in, feat_in], outputs=o_fc4)
+optimizer = tf.keras.optimizers.Adam(learning_rate=1e-2)
+
 outputs = {}
-# Train model
-for epoch in range(epochs):
-    # Construct feed dictionary
+t = time.time()
+for epoch in range(300):
+    with tf.GradientTape() as tape:
+        logits = model((adj_norm_sparse_tensor, feat_x))
+        train_loss = masked_softmax_cross_entropy(preds=logits, labels=y_train, mask=train_mask)
+        train_acc = masked_accuracy(preds=logits, labels=y_train, mask=train_mask)
+    grads = tape.gradient(train_loss, model.trainable_weights)
+    optimizer.apply_gradients(zip(grads, model.trainable_weights))
 
-    # Training step
-    _, train_loss, train_acc = sess.run(
-        (opt_op, loss, accuracy), feed_dict=feed_dict_train
-    )
+    if epoch % 50 == 0:
+        val_loss = masked_softmax_cross_entropy(preds=logits, labels=y_val, mask=val_mask)
+        val_acc = masked_accuracy(preds=logits, labels=y_val, mask=val_mask)
 
-    if epoch % save_every == 0:
-        # Validation
-        val_loss, val_acc = sess.run((loss, accuracy), feed_dict=feed_dict_val)
-
-        # Print results
-        print(
-            "Epoch:",
+        print("Epoch:",
             "%04d" % (epoch + 1),
             "train_loss=",
             "{:.5f}".format(train_loss),
@@ -145,11 +138,10 @@ for epoch in range(epochs):
             "time=",
             "{:.5f}".format(time.time() - t),
         )
-
-        feed_dict_output = {ph["adj_norm"]: adj_norm_tuple, ph["x"]: feat_x_tuple}
-
-        output = sess.run(o_fc3, feed_dict=feed_dict_output)
-        outputs[epoch] = output
+        K.clear_session()
+        interim_model = tf.keras.models.Model(inputs=[adj_in, feat_in], outputs=o_fc3)
+        temp_out = interim_model((adj_norm_sparse_tensor, feat_x))
+        outputs[epoch] = temp_out
 
 node_positions = {
     o: {n: tuple(outputs[o][j]) for j, n in enumerate(nx.nodes(g))} for o in outputs
@@ -164,7 +156,6 @@ e = list(node_positions.keys())
 for i, ax in enumerate(axes.flat):
     pos = node_positions[e[i]]
     ax.set_title(plot_titles[e[i]])
-
     nx.draw(
         g,
         cmap=plt.get_cmap("jet"),
