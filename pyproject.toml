@@ -19,6 +19,7 @@ scipy = "1.4.1"
 PyQt5 = "^5.15.1"
 pydot = "^1.4.1"
 graphviz = "^0.14.1"
+spektral = "^0.6.2"
 
 [tool.poetry.dev-dependencies]
 
